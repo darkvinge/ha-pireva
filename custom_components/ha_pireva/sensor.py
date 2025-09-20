@@ -101,7 +101,7 @@ class PirevaWasteSensor(Entity):
                         try:
                             from datetime import datetime, date
                             next_date_obj = datetime.strptime(next_dump_date, '%Y-%m-%d').date()
-                            days_until = (next_date_obj - date.today()).days + 1
+                            days_until = (next_date_obj - date.today()).days
                             self._attributes['dagar_till_tomning'] = days_until
                         except (ValueError, TypeError) as e:
                             _LOGGER.error("Kunde inte beräkna dagar till tömning: %s", e)
