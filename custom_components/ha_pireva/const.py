@@ -1,2 +1,2 @@
 """Konstanter för Pireva Tomningsschema."""
-DOMAIN = "ha-pireva"
+DOMAIN = "ha_pireva"

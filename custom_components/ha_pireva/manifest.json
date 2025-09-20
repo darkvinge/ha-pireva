@@ -1,5 +1,5 @@
 {
-    "domain": "ha-pireva",
+    "domain": "ha_pireva",
     "name": "Pireva sophämtning i Home Assistant",
     "version": "0.0.1",
     "documentation": "https://github.com/darkvinge/ha-pireva/blob/main/README.md",
