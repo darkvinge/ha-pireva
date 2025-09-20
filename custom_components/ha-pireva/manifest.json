@@ -3,5 +3,7 @@
     "name": "Pireva sophämtning i Home Assistant",
     "version": "0.0.1",
     "documentation": "https://github.com/darkvinge/ha-pireva/blob/main/README.md",
-    "issue_tracker": "https://github.com/darkvinge/ha-pireva/issues"
+    "issue_tracker": "https://github.com/darkvinge/ha-pireva/issues",
+    "config_flow": true,
+    "requirements": ["aiohttp"]
 }

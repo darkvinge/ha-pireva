@@ -10,7 +10,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(hours=24)
+SCAN_INTERVAL = timedelta(hours=12)
 
 def normalize_address(address):
     """Normaliserar en sträng genom att ersätta specialtecken."""
@@ -38,12 +38,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 
 class PirevaWasteSensor(Entity):
     """Anpassad sensor för Pireva tomningsschema."""
+    
+    _attr_scan_interval = SCAN_INTERVAL
 
     def __init__(self, hass, resource_url, address, number):
         """Initiera sensorn."""
         self.hass = hass
         self._resource = resource_url
-        self._address = address
+        self._address = normalize_address(address)
         self._number = number
         self._state = None
         self._attributes = {}
@@ -79,16 +81,23 @@ class PirevaWasteSensor(Entity):
                     
                     data = await response.json()
                     
-                    # Extrahera nästa tömningsdatum och avfallstyp
-                    next_dump_date = data.get('date')
-                    waste_type = data.get('waste_type')
+                    if isinstance(data, list) and data:
+                        json_object = data[0]
+                    else:
+                        _LOGGER.error("API-svaret är inte en lista med data eller är tomt.")
+                        self._state = None
+                        self._attributes = {}
+                        return
+                    
+                    # Extrahera nästa tömningsdatum och avfallstyp från det nya objektet
+                    # OBS: Ändra "data.get" till "json_object.get"
+                    next_dump_date = json_object.get('date')
+                    waste_type = json_object.get('waste_type')
                     
                     if next_dump_date and waste_type:
-                        # Din "raw" sensor blir nu sensorns tillstånd och attribut
                         self._state = next_dump_date
                         self._attributes['avfallstyp'] = waste_type
                         
-                        # Beräkna dagar kvar, men lägg till 1 dag
                         try:
                             from datetime import datetime, date
                             next_date_obj = datetime.strptime(next_dump_date, '%Y-%m-%d').date()
@@ -109,7 +118,7 @@ class PirevaWasteSensor(Entity):
     @property
     def icon(self):
         """Returnerar ikonen baserat på avfallstyp."""
-        if self._attributes.get('avfallstyp') == 'Hushållsavfall':
+        if self._attributes.get('avfallstyp') == 'Restavfall':
             return 'mdi:trash-can'
         if self._attributes.get('avfallstyp') == 'Matavfall':
             return 'mdi:food-apple'
