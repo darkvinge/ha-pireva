@@ -10,7 +10,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(hours=12)
+SCAN_INTERVAL = timedelta(hours=6)
 
 def normalize_address(address):
     """Normaliserar en sträng genom att ersätta specialtecken."""
