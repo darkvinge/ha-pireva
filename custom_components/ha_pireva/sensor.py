@@ -19,6 +19,7 @@ def normalize_address(address):
         .replace("å", "a")
         .replace("ä", "a")
         .replace("ö", "o")
+        .replace(" ", "-")
     )
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):

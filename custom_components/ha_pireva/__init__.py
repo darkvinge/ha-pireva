@@ -15,7 +15,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Skapa en referens till din sensor-entitet efter att den har skapats
     normalized_address = normalize_address(entry.data.get('address'))
-    unique_id = f"pireva_avfallsschema_{normalized_address}_{entry.data.get('number')}"
+    clean_id_part = normalized_address.replace('-', '_')
+    unique_id = f"pireva_avfallsschema_{clean_id_part}_{entry.data.get('number')}"
     entity_id = f"sensor.{unique_id}"
 
 

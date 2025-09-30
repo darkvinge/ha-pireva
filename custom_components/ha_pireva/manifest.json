@@ -1,7 +1,7 @@
 {
     "domain": "ha_pireva",
     "name": "Pireva sophämtning i Home Assistant",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "documentation": "https://github.com/darkvinge/ha-pireva/blob/main/README.md",
     "issue_tracker": "https://github.com/darkvinge/ha-pireva/issues",
     "config_flow": true,
