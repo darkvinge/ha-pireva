@@ -107,6 +107,15 @@ class PirevaWasteSensor(Entity):
                         except (ValueError, TypeError) as e:
                             _LOGGER.error("Kunde inte beräkna dagar till tömning: %s", e)
                             self._attributes['dagar_till_tomning'] = None
+                    if len(data) > 1:
+                        second_object = data[1]
+                        second_date = second_object.get('date')
+                        second_type = second_object.get('waste_type')
+
+                        if second_date and second_type:
+                            self._attributes['efterföljande_datum'] = second_date
+                            self._attributes['efterföljande_avfallstyp'] = second_type
+
                     else:
                         _LOGGER.warning("Saknade 'date' eller 'waste_type' i API-svaret.")
                         self._state = None
