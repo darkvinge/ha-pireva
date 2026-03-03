@@ -1,0 +1,18 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Pireva Tomningsschema",
+        "data": {
+          "address": "Address",
+          "number": "Number"
+        }
+      }
+    },
+    "error": {
+      "invalid_address": "Address not found in Pireva. Check the address and try again.",
+      "cannot_connect": "Could not connect to Pireva. Check your internet connection.",
+      "required": "This field is required."
+    }
+  }
+}

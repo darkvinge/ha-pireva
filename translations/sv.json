@@ -1,0 +1,18 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Pireva Tomningsschema",
+        "data": {
+          "address": "Gatuadress",
+          "number": "Husnummer"
+        }
+      }
+    },
+    "error": {
+      "invalid_address": "Adressen hittades inte hos Pireva. Kontrollera adressen och försök igen.",
+      "cannot_connect": "Kunde inte ansluta till Pireva. Kontrollera din internetanslutning.",
+      "required": "Detta fält är obligatoriskt."
+    }
+  }
+}
