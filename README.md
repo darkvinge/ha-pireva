@@ -42,3 +42,12 @@ Adressen kontrolleras mot Pireva innan den sparas. Om den inte hittas visas ett 
 För kontroll av adressen testa den mot https://www.pireva.se/tomningsschema/address-nummer/?output=json
 t.ex. https://www.pireva.se/tomningsschema/sundsgatan-41/?output=json
 
+# Utveckling
+Testerna körs automatiskt i GitHub Actions vid varje push, tillsammans med hassfest och HACS-validering.
+För att köra dem lokalt (kräver Python 3.13):
+```sh
+python3.13 -m venv .venv
+.venv/bin/pip install -r requirements_test.txt
+.venv/bin/pytest
+```
+
