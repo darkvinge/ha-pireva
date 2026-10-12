@@ -1,135 +1,125 @@
 """Sensor för att visa nästa tomningsdatum från Pireva."""
 
+from __future__ import annotations
+
 import logging
-from datetime import timedelta
-import aiohttp
-from homeassistant.helpers.entity import Entity
-from homeassistant.core import HomeAssistant
+from datetime import date, datetime, timedelta
+from typing import Any
+
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from .const import DOMAIN
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_change
+from homeassistant.util import dt as dt_util
+
+from .api import Pickup, PirevaError, async_fetch_schedule, normalize_address
+from .const import CONF_ADDRESS, CONF_NUMBER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(hours=6)
 
-def normalize_address(address):
-    """Normaliserar en sträng genom att ersätta specialtecken."""
-    return (
-        address.lower()
-        .replace("å", "a")
-        .replace("ä", "a")
-        .replace("ö", "o")
-        .replace(" ", "-")
-    )
+ICONS = {
+    "Restavfall": "mdi:trash-can",
+    "Matavfall": "mdi:food-apple",
+}
+DEFAULT_ICON = "mdi:calendar-clock"
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
     """Sätt upp sensorer från en config entry."""
-    address = config_entry.data.get("address")
-    number = config_entry.data.get("number")
+    address = config_entry.data.get(CONF_ADDRESS)
+    number = config_entry.data.get(CONF_NUMBER)
 
     if not address or not number:
         _LOGGER.error("Adress eller nummer saknas i konfigurationen.")
         return
 
-    normalized_address = normalize_address(address)
-    resource_url = f"https://www.pireva.se/tomningsschema/{normalized_address}-{number}/?output=json"
+    async_add_entities(
+        [PirevaWasteSensor(hass, address, number)],
+        update_before_add=True,
+    )
 
-    async_add_entities([PirevaWasteSensor(hass, resource_url, address, number)])
 
+class PirevaWasteSensor(SensorEntity):
+    """Sensor för nästa tömning enligt Pirevas tomningsschema."""
 
-class PirevaWasteSensor(Entity):
-    """Anpassad sensor för Pireva tomningsschema."""
-    
-    _attr_scan_interval = SCAN_INTERVAL
+    _attr_device_class = SensorDeviceClass.DATE
 
-    def __init__(self, hass, resource_url, address, number):
+    def __init__(self, hass: HomeAssistant, address: str, number: str) -> None:
         """Initiera sensorn."""
-        self.hass = hass
-        self._resource = resource_url
-        self._address = normalize_address(address)
+        self._session = async_get_clientsession(hass)
+        self._address = address
         self._number = number
-        self._state = None
-        self._attributes = {}
+        self._pickups: list[Pickup] = []
+
+        slug = normalize_address(address)
+        self._attr_name = f"Pireva Avfallsschema {slug}-{number}"
+        self._attr_unique_id = f"{DOMAIN}_{slug}_{number}"
 
     @property
-    def name(self):
-        """Returnerar namnet på sensorn."""
-        return f"Pireva Avfallsschema {self._address}-{self._number}"
+    def native_value(self) -> date | None:
+        """Returnerar nästa tömningsdatum."""
+        return self._pickups[0].date if self._pickups else None
 
     @property
-    def state(self):
-        """Returnerar sensorns tillstånd (nästa tömningsdatum)."""
-        return self._state
+    def icon(self) -> str:
+        """Returnerar ikonen baserat på avfallstyp."""
+        if not self._pickups:
+            return DEFAULT_ICON
+        return ICONS.get(self._pickups[0].waste_type, DEFAULT_ICON)
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Returnerar sensorns attribut."""
-        return self._attributes
-    
-    @property
-    def unique_id(self):
-        """Returnerar en unik ID för entiteten."""
-        return f"{DOMAIN}_{self._address}_{self._number}"
+        if not self._pickups:
+            return {}
 
-    async def async_update(self):
+        first = self._pickups[0]
+        attributes: dict[str, Any] = {
+            "avfallstyp": first.waste_type,
+            "dagar_till_tomning": (first.date - dt_util.now().date()).days,
+        }
+        if len(self._pickups) > 1:
+            second = self._pickups[1]
+            attributes["efterfoljande_datum"] = second.date.isoformat()
+            attributes["efterfoljande_avfallstyp"] = second.waste_type
+        return attributes
+
+    async def async_added_to_hass(self) -> None:
+        """Räkna om dagar kvar strax efter midnatt."""
+        self.async_on_remove(
+            async_track_time_change(
+                self.hass, self._handle_midnight, hour=0, minute=0, second=5
+            )
+        )
+
+    @callback
+    def _handle_midnight(self, _now: datetime) -> None:
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
         """Hämtar den senaste datan från API:et."""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self._resource, timeout=10) as response:
-                    if response.status != 200:
-                        _LOGGER.error("Fel vid hämtning av data: Status %s", response.status)
-                        return
-                    
-                    data = await response.json()
-                    
-                    if isinstance(data, list) and data:
-                        json_object = data[0]
-                    else:
-                        _LOGGER.error("API-svaret är inte en lista med data eller är tomt.")
-                        self._state = None
-                        self._attributes = {}
-                        return
-                    
-                    # Extrahera nästa tömningsdatum och avfallstyp från det nya objektet
-                    # OBS: Ändra "data.get" till "json_object.get"
-                    next_dump_date = json_object.get('date')
-                    waste_type = json_object.get('waste_type')
-                    
-                    if next_dump_date and waste_type:
-                        self._state = next_dump_date
-                        self._attributes['avfallstyp'] = waste_type
-                        
-                        try:
-                            from datetime import datetime, date
-                            next_date_obj = datetime.strptime(next_dump_date, '%Y-%m-%d').date()
-                            days_until = (next_date_obj - date.today()).days
-                            self._attributes['dagar_till_tomning'] = days_until
-                        except (ValueError, TypeError) as e:
-                            _LOGGER.error("Kunde inte beräkna dagar till tömning: %s", e)
-                            self._attributes['dagar_till_tomning'] = None
-                    if len(data) > 1:
-                        second_object = data[1]
-                        second_date = second_object.get('date')
-                        second_type = second_object.get('waste_type')
+            pickups = await async_fetch_schedule(
+                self._session, self._address, self._number
+            )
+        except PirevaError as err:
+            _LOGGER.error("Fel vid hämtning av tomningsschema: %s", err)
+            self._attr_available = False
+            return
 
-                        if second_date and second_type:
-                            self._attributes['efterföljande_datum'] = second_date
-                            self._attributes['efterföljande_avfallstyp'] = second_type
+        if not pickups:
+            _LOGGER.warning("API-svaret innehöll inga tömningar.")
+            self._attr_available = False
+            return
 
-                    else:
-                        _LOGGER.warning("Saknade 'date' eller 'waste_type' i API-svaret.")
-                        self._state = None
-                        self._attributes = {}
-        except aiohttp.ClientError as err:
-            _LOGGER.error("Fel vid API-anrop: %s", err)
-            self._state = None
-            self._attributes = {}
-
-    @property
-    def icon(self):
-        """Returnerar ikonen baserat på avfallstyp."""
-        if self._attributes.get('avfallstyp') == 'Restavfall':
-            return 'mdi:trash-can'
-        if self._attributes.get('avfallstyp') == 'Matavfall':
-            return 'mdi:food-apple'
-        return 'mdi:calendar-clock'
+        today = dt_util.now().date()
+        self._pickups = [p for p in pickups if p.date >= today] or pickups
+        self._attr_available = True

@@ -1,12 +1,21 @@
 """Konfigurationsflöde för Pireva Tomningsschema."""
-import aiohttp
+
 import voluptuous as vol
 from homeassistant import config_entries
-from .const import DOMAIN
-from .sensor import normalize_address
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from .api import (
+    PirevaConnectionError,
+    PirevaInvalidAddressError,
+    async_fetch_schedule,
+    normalize_address,
+)
+from .const import CONF_ADDRESS, CONF_NUMBER, DOMAIN
+
 
 class PirevaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handlar om konfigurationsflödet för Pireva Tomningsschema."""
+
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
@@ -14,39 +23,43 @@ class PirevaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            if not user_input.get("address"):
-                errors["address"] = "required"
-            if not user_input.get("number"):
-                errors["number"] = "required"
+            address = user_input.get(CONF_ADDRESS, "").strip()
+            number = user_input.get(CONF_NUMBER, "").strip()
+
+            if not address:
+                errors[CONF_ADDRESS] = "required"
+            if not number:
+                errors[CONF_NUMBER] = "required"
 
             if not errors:
-                normalized = normalize_address(user_input["address"])
-                number = user_input["number"]
-                url = f"https://www.pireva.se/tomningsschema/{normalized}-{number}/?output=json"
+                await self.async_set_unique_id(
+                    f"{normalize_address(address)}_{number.lower()}"
+                )
+                self._abort_if_unique_id_configured()
 
                 try:
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                            if resp.status != 200:
-                                errors["base"] = "invalid_address"
-                            else:
-                                data = await resp.json()
-                                if not isinstance(data, list) or not data:
-                                    errors["base"] = "invalid_address"
-                except aiohttp.ClientError:
+                    pickups = await async_fetch_schedule(
+                        async_get_clientsession(self.hass), address, number
+                    )
+                except PirevaInvalidAddressError:
+                    errors["base"] = "invalid_address"
+                except PirevaConnectionError:
                     errors["base"] = "cannot_connect"
+                else:
+                    if not pickups:
+                        errors["base"] = "invalid_address"
 
             if not errors:
                 return self.async_create_entry(
-                    title="Pireva Tomningsschema",
-                    data=user_input,
+                    title=f"{address} {number}",
+                    data={CONF_ADDRESS: address, CONF_NUMBER: number},
                 )
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({
-                vol.Required("address"): str,
-                vol.Required("number"): str,
+                vol.Required(CONF_ADDRESS): str,
+                vol.Required(CONF_NUMBER): str,
             }),
             errors=errors,
         )

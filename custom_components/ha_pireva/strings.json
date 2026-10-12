@@ -13,6 +13,9 @@
       "invalid_address": "Address not found in Pireva. Check the address and try again.",
       "cannot_connect": "Could not connect to Pireva. Check your internet connection.",
       "required": "This field is required."
+    },
+    "abort": {
+      "already_configured": "This address is already configured."
     }
   }
 }

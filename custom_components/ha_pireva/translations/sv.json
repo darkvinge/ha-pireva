@@ -13,6 +13,9 @@
       "invalid_address": "Adressen hittades inte hos Pireva. Kontrollera adressen och försök igen.",
       "cannot_connect": "Kunde inte ansluta till Pireva. Kontrollera din internetanslutning.",
       "required": "Detta fält är obligatoriskt."
+    },
+    "abort": {
+      "already_configured": "Den här adressen är redan konfigurerad."
     }
   }
 }
