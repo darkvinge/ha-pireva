@@ -15,6 +15,23 @@ Pireva integration för sophämtning till Home Assistant
 | `efterfoljande_datum` | Datum för efterföljande hämtning |
 | `efterfoljande_avfallstyp` | Typ av avfall vid efterföljande hämtning |
 
+## Kalender
+Integrationen skapar även en kalender-entitet där varje hämtning är en heldagshändelse med avfallstypen som rubrik.
+Kalendern syns under **Kalender** i sidomenyn och kan visas på en dashboard med kortet **Kalender**.
+
+Den kan också användas som utlösare i automationer, t.ex. för en påminnelse kvällen innan hämtning:
+```yaml
+triggers:
+  - trigger: calendar
+    event: start
+    entity_id: calendar.pireva_avfallsschema_sundsgatan_41
+    offset: "-6:00:00"
+actions:
+  - action: notify.notify
+    data:
+      message: "Ställ ut kärlet för {{ trigger.calendar_event.summary }} i kväll"
+```
+
 # Manuell installation
 Placera custom_components/ha_pireva katalogen i custom_components-katalogen i din Home Assistant och starta om Home Assistant.
 
